@@ -50,11 +50,13 @@ def train(config, train_iter,val_iter, model, criterion, optimizer, epoch):
     print("=> EPOCH {}".format(epoch))
     train_iter.init_epoch()
     for batch in train_iter:
+        model = model.to('cuda')
+        # batch = batch.to('cuda')
         iteration += 1
         model.train()
 
-        output, _, __ = model(batch.grapheme, batch.phoneme[:-1].detach())
-        target = batch.phoneme[1:]
+        output, _, __ = model(batch.grapheme.to('cuda'), batch.phoneme[:-1].to('cuda'))
+        target = batch.phoneme[1:].to('cuda')
         loss = criterion(output.view(output.size(0) * output.size(1), -1),
                          target.view(target.size(0) * target.size(1)))
 
@@ -64,7 +66,7 @@ def train(config, train_iter,val_iter, model, criterion, optimizer, epoch):
         optimizer.step()
 
         n_total += batch.batch_size
-        train_loss += loss.data[0] * batch.batch_size
+        train_loss += loss.data * batch.batch_size
 
         if iteration % config.log_every == 0:
             train_loss /= n_total
@@ -98,10 +100,10 @@ def validate(val_iter, model, criterion):
     val_loss = 0
     val_iter.init_epoch()
     for batch in val_iter:
-        output, _, __ = model(batch.grapheme, batch.phoneme[:-1])
-        target = batch.phoneme[1:]
+        output, _, __ = model(batch.grapheme.to('cuda'), batch.phoneme[:-1].to('cuda'))
+        target = batch.phoneme[1:].to('cuda')
         loss = criterion(output.squeeze(1), target.squeeze(1))
-        val_loss += loss.data[0] * batch.batch_size
+        val_loss += loss.data * batch.batch_size
     return val_loss / len(val_iter.dataset)
 
 
@@ -111,7 +113,7 @@ def test(test_iter, model, criterion):
     test_per = test_wer = 0
     for batch in test_iter:
 
-        output = model(batch.grapheme).data.tolist()
+        output = model(batch.grapheme.to('cuda')).data.tolist()
         target = batch.phoneme[1:].squeeze(1).data.tolist()
         # calculate per, wer here
         per = phoneme_error_rate(output, target)
