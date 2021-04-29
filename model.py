@@ -93,18 +93,14 @@ class G2P(nn.Module):
             return self._generate(h, c, context)
 
     def _generate(self, h, c, context):
-        beam = Beam(self.config.beam_size, cuda=self.config.cuda)
-        # Make a beam_size batch.
-        h = h.expand(beam.size, h.size(1))
-        c = c.expand(beam.size, c.size(1))
-        context = context.expand(beam.size, context.size(1), context.size(2))
-
+        results = []
+        tt = torch.cuda
+        x = tt.LongTensor([[2]])
         for i in range(self.config.max_len):  # max_len = 20
-            x = beam.get_current_state()
-            o, h, c = self.decoder(Variable(x.unsqueeze(0)), h, c, context)
-            if beam.advance(o.data.squeeze(0)):
-                break
-            h.data.copy_(h.data.index_select(0, beam.get_current_origin()))
-            c.data.copy_(c.data.index_select(0, beam.get_current_origin()))
-        tt = torch.cuda if self.config.cuda else torch
-        return Variable(tt.LongTensor(beam.get_hyp(0)))
+            o, h, c = self.decoder(x, h, c, None)
+            x = o.argmax(-1)
+            idx = x.view(-1).data.tolist()[0]
+            if idx == 3:
+              break
+            results.append(idx)
+        return results
